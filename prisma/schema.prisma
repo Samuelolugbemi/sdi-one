@@ -1,0 +1,1583 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider     = "postgresql"
+  url          = env("DATABASE_URL")
+  relationMode = "prisma"
+}
+
+model Customer {
+  id         Int      @id @default(autoincrement())
+  customerId String   @unique
+  name       String?
+  address1   String?
+  city       String?
+  state      String?
+  zipCode    String?
+  type       String?
+  raw        Json?
+  importedAt DateTime @default(now())
+
+  jobs Job[]
+
+  @@index([name])
+}
+
+model Vendor {
+  id         Int      @id @default(autoincrement())
+  vendorId   String   @unique
+  name       String?
+  address1   String?
+  city       String?
+  state      String?
+  zipCode    String?
+  type       String?
+  raw        Json?
+  importedAt DateTime @default(now())
+
+  invoices     Invoice[]
+  invoiceLines InvoiceLine[]
+
+  @@index([name])
+}
+
+model Job {
+  id             Int      @id @default(autoincrement())
+  jobId          String   @unique
+  well           String?
+  description    String?
+  county         String?
+  uniqueJob      String?  @unique
+  recordTypeName String?
+  status         String?
+  customerId     String?
+  workTypeId     String?
+  raw            Json?
+  importedAt     DateTime @default(now())
+
+  customer             Customer?              @relation(fields: [customerId], references: [customerId])
+  invoiceLines         InvoiceLine[]          @relation("InvoiceLineJob")
+  invoiceLinesByUnique InvoiceLine[]          @relation("InvoiceLineUniqueJob")
+  inventoryRows        InventoryTransaction[] @relation("InventoryJob")
+  inventoryByUnique    InventoryTransaction[] @relation("InventoryUniqueJob")
+
+  planningItems       PlanningItem[]
+  planningTasks       PlanningTask[]
+  resourceAssignments ResourceAssignment[]
+
+  @@index([customerId])
+  @@index([status])
+  @@index([uniqueJob])
+}
+
+model Invoice {
+  id                  Int       @id @default(autoincrement())
+  sageId              String    @unique
+  vendorId            String?
+  invoiceDate         DateTime?
+  invoice             String?
+  vendorInvoiceNumber String?
+  description         String?
+  amount              Decimal?  @db.Decimal(18, 2)
+  raw                 Json?
+  importedAt          DateTime  @default(now())
+
+  vendor Vendor?       @relation(fields: [vendorId], references: [vendorId])
+  lines  InvoiceLine[] @relation("InvoiceLineInvoice")
+
+  @@index([vendorId])
+  @@index([invoiceDate])
+}
+
+model InvoiceLine {
+  id                  Int       @id @default(autoincrement())
+  sageId              String    @unique
+  invoiceSageId       String?
+  parentInvoiceSageId String?
+  jobId               String?
+  uniqueJob           String?
+  costCode            String?
+  activityStatus      String?
+  activityDate        DateTime?
+  transactionDate     DateTime?
+  amount              Decimal?  @db.Decimal(18, 2)
+  vendorId            String?
+  expenseAccount      String?
+  description         String?
+  raw                 Json?
+  importedAt          DateTime  @default(now())
+
+  invoice     Invoice? @relation("InvoiceLineInvoice", fields: [invoiceSageId], references: [sageId])
+  job         Job?     @relation("InvoiceLineJob", fields: [jobId], references: [jobId])
+  jobByUnique Job?     @relation("InvoiceLineUniqueJob", fields: [uniqueJob], references: [uniqueJob])
+  vendor      Vendor?  @relation(fields: [vendorId], references: [vendorId])
+
+  @@index([invoiceSageId])
+  @@index([jobId])
+  @@index([uniqueJob])
+  @@index([vendorId])
+  @@index([transactionDate])
+  @@index([costCode])
+}
+
+model Equipment {
+  id          Int      @id @default(autoincrement())
+  equipmentId String   @unique
+  description String?
+  status      String?
+  raw         Json?
+  importedAt  DateTime @default(now())
+
+  @@index([status])
+}
+
+model InventoryTransaction {
+  id                Int       @id @default(autoincrement())
+  rowId             String    @unique
+  accountingDate    DateTime?
+  amount            Decimal?  @db.Decimal(18, 2)
+  dateStamp         DateTime?
+  description       String?
+  jcTransactionType String?
+  transactionDate   DateTime?
+  unitCost          Decimal?  @db.Decimal(18, 4)
+  units             Decimal?  @db.Decimal(18, 4)
+  costCode          String?
+  jobId             String?
+  uniqueJobNumber   String?
+  raw               Json?
+  importedAt        DateTime  @default(now())
+
+  job         Job? @relation("InventoryJob", fields: [jobId], references: [jobId])
+  jobByUnique Job? @relation("InventoryUniqueJob", fields: [uniqueJobNumber], references: [uniqueJob])
+
+  @@index([jobId])
+  @@index([uniqueJobNumber])
+  @@index([transactionDate])
+  @@index([costCode])
+}
+
+model ImportRun {
+  id           Int       @id @default(autoincrement())
+  source       String
+  fileName     String?
+  status       String
+  rowsImported Int       @default(0)
+  rowsFailed   Int       @default(0)
+  message      String?
+  startedAt    DateTime  @default(now())
+  finishedAt   DateTime?
+}
+
+model DataSourceConnection {
+  id             Int       @id @default(autoincrement())
+  system         String    @unique
+  status         String    @default("Not configured")
+  connectionType String?
+  notes          String?
+  lastSyncAt     DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+}
+
+// SDI One v0.2 Platform Layer
+model AppUser {
+  id           Int       @id @default(autoincrement())
+  email        String    @unique
+  name         String?
+  title        String?
+  department   String?
+  status       String    @default("Active")
+  passwordHash String?
+  isExecutive  Boolean   @default(false)
+  lastLoginAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  roles         UserRole[]
+  companyAccess UserCompanyAccess[]
+  jobAccess     UserJobAccess[]
+  auditLogs     AuditLog[]
+  sessions      UserSession[]
+  notifications NotificationItem[]
+  favorites     WorkspaceFavorite[]
+}
+
+model Role {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  description String?
+  isSystem    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  users       UserRole[]
+  permissions RolePermission[]
+}
+
+model Permission {
+  id          Int     @id @default(autoincrement())
+  key         String  @unique
+  module      String
+  action      String
+  description String?
+
+  roles RolePermission[]
+}
+
+model UserRole {
+  id     Int @id @default(autoincrement())
+  userId Int
+  roleId Int
+
+  user AppUser @relation(fields: [userId], references: [id])
+  role Role    @relation(fields: [roleId], references: [id])
+
+  @@unique([userId, roleId])
+}
+
+model RolePermission {
+  id           Int @id @default(autoincrement())
+  roleId       Int
+  permissionId Int
+
+  role       Role       @relation(fields: [roleId], references: [id])
+  permission Permission @relation(fields: [permissionId], references: [id])
+
+  @@unique([roleId, permissionId])
+}
+
+model UserCompanyAccess {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  companyId String
+  createdAt DateTime @default(now())
+
+  user AppUser @relation(fields: [userId], references: [id])
+
+  @@unique([userId, companyId])
+  @@index([companyId])
+}
+
+model UserJobAccess {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  jobId     String
+  createdAt DateTime @default(now())
+
+  user AppUser @relation(fields: [userId], references: [id])
+
+  @@unique([userId, jobId])
+  @@index([jobId])
+}
+
+model DocumentRecord {
+  id              Int       @id @default(autoincrement())
+  entityType      String
+  entityKey       String
+  entityLabel     String?
+  fileName        String
+  originalName    String?
+  fileType        String?
+  mimeType        String?
+  sizeBytes       Int?
+  storageProvider String    @default("local")
+  storageBucket   String?
+  storageKey      String?
+  contentHash     String?
+  description     String?
+  category        String?
+  status          String    @default("Active")
+  version         Int       @default(1)
+  uploadedBy      String?
+  isDeleted       Boolean   @default(false)
+  deletedAt       DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  versions     DocumentVersion[]
+  shares       DocumentShare[]
+  accessEvents DocumentAccessEvent[]
+
+  @@index([entityType, entityKey])
+  @@index([fileName])
+  @@index([category])
+  @@index([status])
+}
+
+model TimelineEvent {
+  id          Int      @id @default(autoincrement())
+  entityType  String
+  entityKey   String
+  eventType   String
+  title       String
+  description String?
+  source      String?
+  occurredAt  DateTime @default(now())
+  raw         Json?
+
+  @@index([entityType, entityKey])
+  @@index([occurredAt])
+}
+
+model EntityRelationship {
+  id               Int      @id @default(autoincrement())
+  sourceEntityType String
+  sourceEntityKey  String
+  targetEntityType String
+  targetEntityKey  String
+  relationshipType String
+  sourceSystem     String?
+  createdAt        DateTime @default(now())
+
+  @@index([sourceEntityType, sourceEntityKey])
+  @@index([targetEntityType, targetEntityKey])
+}
+
+model NotificationRule {
+  id          Int      @id @default(autoincrement())
+  name        String
+  module      String
+  eventType   String
+  severity    String   @default("Info")
+  enabled     Boolean  @default(true)
+  description String?
+  createdAt   DateTime @default(now())
+}
+
+model AuditLog {
+  id          Int      @id @default(autoincrement())
+  userId      Int?
+  action      String
+  entityType  String?
+  entityKey   String?
+  description String?
+  ipAddress   String?
+  createdAt   DateTime @default(now())
+
+  user AppUser? @relation(fields: [userId], references: [id])
+
+  @@index([entityType, entityKey])
+  @@index([createdAt])
+}
+
+model SavedReport {
+  id          Int      @id @default(autoincrement())
+  name        String
+  category    String
+  description String?
+  config      Json?
+  createdBy   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model FeatureFlag {
+  id          Int      @id @default(autoincrement())
+  key         String   @unique
+  name        String
+  enabled     Boolean  @default(false)
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// SDI One v0.3 Metadata Entity Engine
+model EntityType {
+  id                Int      @id @default(autoincrement())
+  key               String   @unique
+  displayName       String
+  pluralName        String
+  domain            String
+  description       String?
+  icon              String?
+  color             String?
+  sourceModel       String?
+  routePath         String?
+  isSystem          Boolean  @default(false)
+  isActive          Boolean  @default(true)
+  supportsSearch    Boolean  @default(true)
+  supportsTimeline  Boolean  @default(true)
+  supportsDocuments Boolean  @default(true)
+  supportsAi        Boolean  @default(true)
+  sortOrder         Int      @default(0)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  fields                  EntityField[]
+  capabilities            EntityCapability[]
+  workspaceSections       EntityWorkspaceSection[]
+  permissionTemplates     EntityPermissionTemplate[]
+  relationshipRulesSource EntityRelationshipRule[]   @relation("RelationshipRuleSource")
+  relationshipRulesTarget EntityRelationshipRule[]   @relation("RelationshipRuleTarget")
+
+  @@index([domain])
+  @@index([isActive])
+}
+
+model EntityField {
+  id              Int      @id @default(autoincrement())
+  entityTypeId    Int
+  key             String
+  label           String
+  fieldType       String   @default("text")
+  sourceColumn    String?
+  description     String?
+  isPrimary       Boolean  @default(false)
+  isSearchable    Boolean  @default(false)
+  isListVisible   Boolean  @default(true)
+  isDetailVisible Boolean  @default(true)
+  isFilterable    Boolean  @default(false)
+  isSortable      Boolean  @default(false)
+  required        Boolean  @default(false)
+  sortOrder       Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  entityType EntityType @relation(fields: [entityTypeId], references: [id])
+
+  @@unique([entityTypeId, key])
+  @@index([entityTypeId])
+}
+
+model EntityCapability {
+  id           Int      @id @default(autoincrement())
+  entityTypeId Int
+  key          String
+  label        String
+  description  String?
+  status       String   @default("Active")
+  sortOrder    Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  entityType EntityType @relation(fields: [entityTypeId], references: [id])
+
+  @@unique([entityTypeId, key])
+  @@index([entityTypeId])
+}
+
+model EntityWorkspaceSection {
+  id           Int      @id @default(autoincrement())
+  entityTypeId Int
+  key          String
+  label        String
+  description  String?
+  sectionType  String   @default("panel")
+  enabled      Boolean  @default(true)
+  config       Json?
+  sortOrder    Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  entityType EntityType @relation(fields: [entityTypeId], references: [id])
+
+  @@unique([entityTypeId, key])
+  @@index([entityTypeId])
+}
+
+model EntityPermissionTemplate {
+  id           Int      @id @default(autoincrement())
+  entityTypeId Int
+  action       String
+  key          String
+  label        String
+  description  String?
+  defaultRoles Json?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  entityType EntityType @relation(fields: [entityTypeId], references: [id])
+
+  @@unique([entityTypeId, action])
+  @@index([entityTypeId])
+}
+
+model EntityRelationshipRule {
+  id                 Int      @id @default(autoincrement())
+  key                String   @unique
+  sourceEntityTypeId Int
+  targetEntityTypeId Int
+  label              String
+  inverseLabel       String?
+  relationshipType   String
+  sourceField        String
+  targetField        String
+  cardinality        String   @default("many-to-one")
+  description        String?
+  enabled            Boolean  @default(true)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  sourceEntityType EntityType @relation("RelationshipRuleSource", fields: [sourceEntityTypeId], references: [id])
+  targetEntityType EntityType @relation("RelationshipRuleTarget", fields: [targetEntityTypeId], references: [id])
+
+  @@index([sourceEntityTypeId])
+  @@index([targetEntityTypeId])
+}
+
+// SDI One v0.4 Platform Core Completion
+model UserSession {
+  id        Int       @id @default(autoincrement())
+  userId    Int?
+  tokenHash String?   @unique
+  ipAddress String?
+  userAgent String?
+  expiresAt DateTime?
+  createdAt DateTime  @default(now())
+  revokedAt DateTime?
+
+  user AppUser? @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model SearchIndex {
+  id         Int      @id @default(autoincrement())
+  entityType String
+  entityKey  String
+  title      String
+  subtitle   String?
+  body       String?
+  href       String
+  source     String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([entityType, entityKey])
+  @@index([entityType])
+  @@index([title])
+}
+
+model NotificationItem {
+  id         Int       @id @default(autoincrement())
+  userId     Int?
+  title      String
+  message    String?
+  severity   String    @default("Info")
+  entityType String?
+  entityKey  String?
+  href       String?
+  readAt     DateTime?
+  createdAt  DateTime  @default(now())
+
+  user AppUser? @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([entityType, entityKey])
+  @@index([createdAt])
+}
+
+model WorkflowDefinition {
+  id          Int      @id @default(autoincrement())
+  key         String   @unique
+  name        String
+  description String?
+  triggerType String
+  enabled     Boolean  @default(true)
+  config      Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  runs WorkflowRun[]
+}
+
+model WorkflowRun {
+  id           Int       @id @default(autoincrement())
+  workflowId   Int
+  status       String    @default("Pending")
+  entityType   String?
+  entityKey    String?
+  currentStage String?
+  startedAt    DateTime  @default(now())
+  completedAt  DateTime?
+  context      Json?
+
+  workflow WorkflowDefinition @relation(fields: [workflowId], references: [id])
+
+  @@index([workflowId])
+  @@index([entityType, entityKey])
+  @@index([status])
+}
+
+model WorkspaceFavorite {
+  id         Int      @id @default(autoincrement())
+  userId     Int?
+  entityType String
+  entityKey  String
+  title      String
+  href       String
+  createdAt  DateTime @default(now())
+
+  user AppUser? @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([entityType, entityKey])
+}
+
+model EntityActivity {
+  id           Int      @id @default(autoincrement())
+  entityType   String
+  entityKey    String
+  activityType String
+  title        String
+  description  String?
+  actor        String?
+  source       String?
+  createdAt    DateTime @default(now())
+  raw          Json?
+
+  @@index([entityType, entityKey])
+  @@index([createdAt])
+}
+
+model DocumentFolder {
+  id          Int      @id @default(autoincrement())
+  name        String
+  entityType  String?
+  entityKey   String?
+  description String?
+  createdAt   DateTime @default(now())
+
+  @@index([entityType, entityKey])
+}
+
+model DocumentVersion {
+  id         Int      @id @default(autoincrement())
+  documentId Int
+  version    Int
+  fileName   String
+  storageKey String?
+  sizeBytes  Int?
+  mimeType   String?
+  uploadedBy String?
+  notes      String?
+  createdAt  DateTime @default(now())
+
+  document DocumentRecord @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@unique([documentId, version])
+}
+
+model DocumentShare {
+  id         Int       @id @default(autoincrement())
+  documentId Int
+  shareType  String // User, Role, Company, PublicLink
+  targetKey  String?
+  permission String    @default("View")
+  expiresAt  DateTime?
+  createdBy  String?
+  createdAt  DateTime  @default(now())
+
+  document DocumentRecord @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([shareType, targetKey])
+}
+
+model DocumentAccessEvent {
+  id         Int      @id @default(autoincrement())
+  documentId Int
+  eventType  String // View, Download, Upload, Delete, Restore
+  actor      String?
+  ipAddress  String?
+  createdAt  DateTime @default(now())
+
+  document DocumentRecord @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([eventType])
+  @@index([createdAt])
+}
+
+model DocumentRequirement {
+  id          Int      @id @default(autoincrement())
+  entityType  String
+  category    String
+  requiredFor String? // Approval, Closeout, InvoiceReview, Maintenance
+  description String?
+  isRequired  Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  @@unique([entityType, category, requiredFor])
+}
+
+// SDI One v0.5 Milestones 1-3 Completion: Enterprise Platform, Workspaces, Mission Control
+model PlatformEvent {
+  id          Int       @id @default(autoincrement())
+  eventType   String
+  entityType  String?
+  entityKey   String?
+  title       String
+  description String?
+  severity    String    @default("Info")
+  source      String?
+  payload     Json?
+  createdAt   DateTime  @default(now())
+  processedAt DateTime?
+
+  @@index([eventType])
+  @@index([entityType, entityKey])
+  @@index([createdAt])
+}
+
+model DashboardDefinition {
+  id          Int      @id @default(autoincrement())
+  key         String   @unique
+  name        String
+  audience    String
+  description String?
+  layout      Json?
+  isSystem    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  widgets DashboardWidget[]
+}
+
+model DashboardWidget {
+  id          Int      @id @default(autoincrement())
+  dashboardId Int?
+  key         String   @unique
+  title       String
+  widgetType  String
+  domain      String
+  size        String   @default("md")
+  config      Json?
+  sortOrder   Int      @default(0)
+  enabled     Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  dashboard DashboardDefinition? @relation(fields: [dashboardId], references: [id])
+
+  @@index([dashboardId])
+  @@index([domain])
+}
+
+model KpiDefinition {
+  id          Int      @id @default(autoincrement())
+  key         String   @unique
+  name        String
+  domain      String
+  description String?
+  queryKey    String?
+  format      String   @default("number")
+  targetValue Decimal? @db.Decimal(18, 2)
+  enabled     Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([domain])
+}
+
+model OperationalAlert {
+  id          Int       @id @default(autoincrement())
+  title       String
+  description String?
+  severity    String    @default("Info")
+  domain      String
+  entityType  String?
+  entityKey   String?
+  status      String    @default("Open")
+  source      String?
+  createdAt   DateTime  @default(now())
+  resolvedAt  DateTime?
+
+  @@index([status])
+  @@index([domain])
+  @@index([entityType, entityKey])
+}
+
+model DataQualityCheck {
+  id          Int       @id @default(autoincrement())
+  key         String    @unique
+  name        String
+  domain      String
+  description String?
+  severity    String    @default("Warning")
+  status      String    @default("Pending")
+  resultCount Int       @default(0)
+  lastRunAt   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([domain])
+  @@index([status])
+}
+
+model AiInsight {
+  id          Int      @id @default(autoincrement())
+  entityType  String?
+  entityKey   String?
+  insightType String
+  title       String
+  summary     String
+  severity    String   @default("Info")
+  confidence  Decimal? @db.Decimal(5, 2)
+  source      String?
+  createdAt   DateTime @default(now())
+
+  @@index([entityType, entityKey])
+  @@index([insightType])
+}
+
+model ApprovalRequest {
+  id          Int       @id @default(autoincrement())
+  title       String
+  description String?
+  entityType  String?
+  entityKey   String?
+  requestedBy String?
+  assignedTo  String?
+  status      String    @default("Pending")
+  dueAt       DateTime?
+  createdAt   DateTime  @default(now())
+  completedAt DateTime?
+
+  @@index([status])
+  @@index([entityType, entityKey])
+}
+
+model WorkItem {
+  id          Int       @id @default(autoincrement())
+  title       String
+  description String?
+  workType    String
+  priority    String    @default("Normal")
+  status      String    @default("Open")
+  entityType  String?
+  entityKey   String?
+  assignedTo  String?
+  dueAt       DateTime?
+  createdAt   DateTime  @default(now())
+  completedAt DateTime?
+
+  @@index([status])
+  @@index([entityType, entityKey])
+}
+
+// SDI One v0.6 Milestones 6-8: Enterprise Automation, AI Platform, Integration Platform
+model AutomationRule {
+  id          Int      @id @default(autoincrement())
+  key         String   @unique
+  name        String
+  description String?
+  domain      String
+  entityType  String?
+  triggerType String
+  condition   Json?
+  action      Json?
+  severity    String   @default("Info")
+  enabled     Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([domain])
+  @@index([entityType])
+  @@index([enabled])
+}
+
+model ScheduledJobDefinition {
+  id          Int       @id @default(autoincrement())
+  key         String    @unique
+  name        String
+  description String?
+  schedule    String
+  jobType     String
+  status      String    @default("Enabled")
+  lastRunAt   DateTime?
+  nextRunAt   DateTime?
+  config      Json?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  runs ScheduledJobRun[]
+
+  @@index([status])
+  @@index([jobType])
+}
+
+model ScheduledJobRun {
+  id         Int       @id @default(autoincrement())
+  jobId      Int
+  status     String    @default("Started")
+  message    String?
+  startedAt  DateTime  @default(now())
+  finishedAt DateTime?
+  metrics    Json?
+
+  job ScheduledJobDefinition @relation(fields: [jobId], references: [id])
+
+  @@index([jobId])
+  @@index([status])
+  @@index([startedAt])
+}
+
+model ApprovalPolicy {
+  id          Int      @id @default(autoincrement())
+  key         String   @unique
+  name        String
+  description String?
+  entityType  String
+  domain      String
+  condition   Json?
+  steps       Json?
+  enabled     Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([entityType])
+  @@index([domain])
+}
+
+model TaskItem {
+  id          Int       @id @default(autoincrement())
+  title       String
+  description String?
+  taskType    String
+  priority    String    @default("Normal")
+  status      String    @default("Open")
+  entityType  String?
+  entityKey   String?
+  assignedTo  String?
+  dueAt       DateTime?
+  source      String?
+  createdAt   DateTime  @default(now())
+  completedAt DateTime?
+
+  @@index([status])
+  @@index([assignedTo])
+  @@index([entityType, entityKey])
+}
+
+model AiProviderConfig {
+  id        Int      @id @default(autoincrement())
+  key       String   @unique
+  name      String
+  provider  String
+  modelName String?
+  status    String   @default("Not configured")
+  purpose   String?
+  config    Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([provider])
+  @@index([status])
+}
+
+model AiPromptTemplate {
+  id          Int      @id @default(autoincrement())
+  key         String   @unique
+  name        String
+  description String?
+  scope       String
+  entityType  String?
+  prompt      String
+  variables   Json?
+  enabled     Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([scope])
+  @@index([entityType])
+}
+
+model AiBriefing {
+  id           Int      @id @default(autoincrement())
+  briefingDate DateTime @default(now())
+  audience     String
+  title        String
+  summary      String
+  highlights   Json?
+  risks        Json?
+  actions      Json?
+  createdAt    DateTime @default(now())
+
+  @@index([audience])
+  @@index([briefingDate])
+}
+
+model AiRecommendation {
+  id             Int       @id @default(autoincrement())
+  entityType     String?
+  entityKey      String?
+  category       String
+  title          String
+  recommendation String
+  impact         String?
+  confidence     Decimal?  @db.Decimal(5, 2)
+  status         String    @default("Open")
+  source         String?
+  createdAt      DateTime  @default(now())
+  dismissedAt    DateTime?
+
+  @@index([entityType, entityKey])
+  @@index([category])
+  @@index([status])
+}
+
+model NaturalLanguageQueryLog {
+  id                Int      @id @default(autoincrement())
+  query             String
+  interpretedIntent String?
+  entities          Json?
+  resultCount       Int      @default(0)
+  userEmail         String?
+  createdAt         DateTime @default(now())
+
+  @@index([createdAt])
+}
+
+model IntegrationConnector {
+  id          Int       @id @default(autoincrement())
+  key         String    @unique
+  name        String
+  system      String
+  category    String
+  status      String    @default("Not configured")
+  description String?
+  authType    String?
+  baseUrl     String?
+  enabled     Boolean   @default(false)
+  lastSyncAt  DateTime?
+  nextSyncAt  DateTime?
+  config      Json?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  mappings IntegrationMapping[]
+  runs     IntegrationRun[]
+  logs     IntegrationLog[]
+
+  @@index([system])
+  @@index([status])
+}
+
+model IntegrationMapping {
+  id             Int      @id @default(autoincrement())
+  connectorId    Int
+  sourceObject   String
+  targetEntity   String
+  fieldMap       Json
+  transformRules Json?
+  enabled        Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  connector IntegrationConnector @relation(fields: [connectorId], references: [id])
+
+  @@index([connectorId])
+  @@index([targetEntity])
+}
+
+model IntegrationRun {
+  id             Int       @id @default(autoincrement())
+  connectorId    Int
+  runType        String
+  status         String    @default("Queued")
+  recordsRead    Int       @default(0)
+  recordsWritten Int       @default(0)
+  recordsFailed  Int       @default(0)
+  message        String?
+  startedAt      DateTime  @default(now())
+  finishedAt     DateTime?
+  metrics        Json?
+
+  connector IntegrationConnector @relation(fields: [connectorId], references: [id])
+
+  @@index([connectorId])
+  @@index([status])
+  @@index([startedAt])
+}
+
+model IntegrationLog {
+  id          Int      @id @default(autoincrement())
+  connectorId Int?
+  level       String   @default("Info")
+  message     String
+  entityType  String?
+  entityKey   String?
+  payload     Json?
+  createdAt   DateTime @default(now())
+
+  connector IntegrationConnector? @relation(fields: [connectorId], references: [id])
+
+  @@index([connectorId])
+  @@index([level])
+  @@index([createdAt])
+}
+
+model IntegrationRetryPolicy {
+  id              Int      @id @default(autoincrement())
+  key             String   @unique
+  name            String
+  maxAttempts     Int      @default(3)
+  backoffType     String   @default("exponential")
+  retryableErrors Json?
+  enabled         Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+// SDI One v0.7 Authentication & RBAC
+model SecurityPolicy {
+  id          Int      @id @default(autoincrement())
+  key         String   @unique
+  name        String
+  description String?
+  enabled     Boolean  @default(true)
+  config      Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model AccessReview {
+  id          Int       @id @default(autoincrement())
+  title       String
+  reviewer    String?
+  status      String    @default("Open")
+  scope       String
+  result      Json?
+  createdAt   DateTime  @default(now())
+  completedAt DateTime?
+
+  @@index([status])
+  @@index([scope])
+}
+
+// SDI One v0.9 Workflow Execution Engine
+model WorkflowStepTemplate {
+  id          Int      @id @default(autoincrement())
+  workflowKey String
+  stepKey     String
+  name        String
+  description String?
+  stepType    String   @default("Action") // Trigger, Condition, Approval, Action, Notification, Integration, Delay
+  sortOrder   Int      @default(0)
+  config      Json?
+  enabled     Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([workflowKey, stepKey])
+  @@index([workflowKey])
+  @@index([stepType])
+}
+
+model WorkflowActionTemplate {
+  id          Int      @id @default(autoincrement())
+  workflowKey String
+  stepKey     String
+  actionKey   String
+  name        String
+  actionType  String // CreateTask, CreateApproval, SendNotification, UpdateEntity, RunIntegration, CreateTimelineEvent
+  description String?
+  config      Json?
+  enabled     Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([workflowKey, stepKey, actionKey])
+  @@index([workflowKey])
+  @@index([actionType])
+}
+
+model WorkflowExecution {
+  id           Int       @id @default(autoincrement())
+  runKey       String    @unique
+  workflowKey  String
+  workflowName String?
+  status       String    @default("Queued") // Queued, Running, Waiting, Completed, Failed, Cancelled
+  entityType   String?
+  entityKey    String?
+  currentStep  String?
+  requestedBy  String?
+  context      Json?
+  startedAt    DateTime  @default(now())
+  completedAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([workflowKey])
+  @@index([status])
+  @@index([entityType, entityKey])
+  @@index([startedAt])
+}
+
+model WorkflowExecutionStep {
+  id              Int       @id @default(autoincrement())
+  executionRunKey String
+  stepKey         String
+  stepName        String
+  stepType        String
+  status          String    @default("Pending") // Pending, Running, Waiting, Completed, Skipped, Failed
+  assignedTo      String?
+  message         String?
+  result          Json?
+  startedAt       DateTime?
+  completedAt     DateTime?
+  createdAt       DateTime  @default(now())
+
+  @@index([executionRunKey])
+  @@index([status])
+  @@index([stepType])
+}
+
+model WorkflowActionRun {
+  id              Int       @id @default(autoincrement())
+  executionRunKey String
+  stepKey         String
+  actionKey       String
+  actionType      String
+  status          String    @default("Pending")
+  message         String?
+  result          Json?
+  startedAt       DateTime?
+  completedAt     DateTime?
+  createdAt       DateTime  @default(now())
+
+  @@index([executionRunKey])
+  @@index([actionType])
+  @@index([status])
+}
+
+model WorkflowEventSubscription {
+  id          Int      @id @default(autoincrement())
+  key         String   @unique
+  eventType   String
+  workflowKey String
+  description String?
+  enabled     Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([eventType])
+  @@index([workflowKey])
+}
+
+model WorkflowQueueItem {
+  id            Int       @id @default(autoincrement())
+  queueKey      String    @unique
+  workflowKey   String
+  entityType    String?
+  entityKey     String?
+  priority      String    @default("Normal")
+  status        String    @default("Queued") // Queued, Locked, Completed, Failed
+  payload       Json?
+  lockedAt      DateTime?
+  lockedBy      String?
+  attempts      Int       @default(0)
+  maxAttempts   Int       @default(3)
+  nextAttemptAt DateTime?
+  createdAt     DateTime  @default(now())
+  completedAt   DateTime?
+
+  @@index([workflowKey])
+  @@index([status])
+  @@index([priority])
+}
+
+// SDI One v1.0: Live AI platform, context snapshots, and AI action planning
+model AiConversation {
+  id         Int      @id @default(autoincrement())
+  title      String?
+  userEmail  String?
+  entityType String?
+  entityKey  String?
+  status     String   @default("Open")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  messages AiMessage[]
+
+  @@index([userEmail])
+  @@index([entityType, entityKey])
+  @@index([createdAt])
+}
+
+model AiMessage {
+  id             Int      @id @default(autoincrement())
+  conversationId Int
+  role           String
+  content        String
+  context        Json?
+  createdAt      DateTime @default(now())
+
+  conversation AiConversation @relation(fields: [conversationId], references: [id])
+
+  @@index([conversationId])
+  @@index([role])
+  @@index([createdAt])
+}
+
+model AiContextSnapshot {
+  id            Int      @id @default(autoincrement())
+  entityType    String
+  entityKey     String
+  summary       String
+  metrics       Json?
+  relationships Json?
+  generatedAt   DateTime @default(now())
+
+  @@index([entityType, entityKey])
+  @@index([generatedAt])
+}
+
+model AiActionPlan {
+  id          Int       @id @default(autoincrement())
+  entityType  String?
+  entityKey   String?
+  title       String
+  objective   String
+  priority    String    @default("Normal")
+  status      String    @default("Proposed")
+  steps       Json
+  owner       String?
+  createdAt   DateTime  @default(now())
+  completedAt DateTime?
+
+  @@index([entityType, entityKey])
+  @@index([status])
+  @@index([priority])
+}
+
+model FleetVehicle {
+  id             Int       @id @default(autoincrement())
+  unitNumber     String    @unique
+  equipmentId    String?
+  vin            String?
+  make           String?
+  model          String?
+  modelYear      Int?
+  ownerCompanyId String?
+  status         String    @default("Active")
+  currentJobId   String?
+  odometerMiles  Decimal?  @db.Decimal(18, 2)
+  engineHours    Decimal?  @db.Decimal(18, 2)
+  fuelCostMtd    Decimal?  @db.Decimal(18, 2)
+  fuelGallonsMtd Decimal?  @db.Decimal(18, 2)
+  mpg            Decimal?  @db.Decimal(18, 2)
+  utilizationPct Decimal?  @db.Decimal(8, 2)
+  lastLocation   String?
+  lastSeenAt     DateTime?
+  healthStatus   String    @default("Unknown")
+  sourceSystem   String?   @default("SDI One")
+  raw            Json?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  fuelTransactions FuelTransaction[]
+  telematics       TelematicsSnapshot[]
+  maintenance      MaintenanceAlert[]
+
+  @@index([equipmentId])
+  @@index([ownerCompanyId])
+  @@index([currentJobId])
+  @@index([status])
+  @@index([healthStatus])
+}
+
+model FuelTransaction {
+  id              Int       @id @default(autoincrement())
+  transactionKey  String    @unique
+  vehicleId       Int?
+  unitNumber      String?
+  transactionDate DateTime?
+  vendorName      String?
+  cardNumber      String?
+  driverName      String?
+  gallons         Decimal?  @db.Decimal(18, 3)
+  amount          Decimal?  @db.Decimal(18, 2)
+  odometerMiles   Decimal?  @db.Decimal(18, 2)
+  fuelType        String?
+  location        String?
+  costPerGallon   Decimal?  @db.Decimal(18, 4)
+  sourceSystem    String?   @default("Fuel System")
+  raw             Json?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  vehicle FleetVehicle? @relation(fields: [vehicleId], references: [id])
+
+  @@index([unitNumber])
+  @@index([transactionDate])
+  @@index([sourceSystem])
+}
+
+model TelematicsSnapshot {
+  id                   Int      @id @default(autoincrement())
+  snapshotKey          String   @unique
+  vehicleId            Int?
+  unitNumber           String?
+  sourceSystem         String   @default("Telematics")
+  latitude             Decimal? @db.Decimal(12, 7)
+  longitude            Decimal? @db.Decimal(12, 7)
+  speedMph             Decimal? @db.Decimal(10, 2)
+  bearing              Decimal? @db.Decimal(10, 2)
+  odometerMiles        Decimal? @db.Decimal(18, 2)
+  engineHours          Decimal? @db.Decimal(18, 2)
+  isCommunicating      Boolean  @default(false)
+  currentState         String?
+  currentStateDuration Int?
+  faultCount           Int      @default(0)
+  capturedAt           DateTime @default(now())
+  raw                  Json?
+
+  vehicle FleetVehicle? @relation(fields: [vehicleId], references: [id])
+
+  @@index([unitNumber])
+  @@index([sourceSystem])
+  @@index([capturedAt])
+}
+
+model MaintenanceAlert {
+  id           Int       @id @default(autoincrement())
+  alertKey     String    @unique
+  vehicleId    Int?
+  unitNumber   String?
+  severity     String    @default("Info")
+  status       String    @default("Open")
+  category     String?
+  title        String
+  description  String?
+  dueAt        DateTime?
+  resolvedAt   DateTime?
+  sourceSystem String?   @default("SDI One")
+  raw          Json?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  vehicle FleetVehicle? @relation(fields: [vehicleId], references: [id])
+
+  @@index([unitNumber])
+  @@index([severity])
+  @@index([status])
+  @@index([dueAt])
+}
+
+// v1.5 Project Planning / Monday.com Connector
+model PlanningBoard {
+  id            Int      @id @default(autoincrement())
+  boardKey      String   @unique
+  name          String
+  ownerTeam     String?
+  status        String   @default("Active")
+  sourceSystem  String   @default("SDI One")
+  mondayBoardId String?
+  description   String?
+  raw           Json?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  items PlanningItem[]
+  tasks PlanningTask[]
+
+  @@index([status])
+  @@index([sourceSystem])
+  @@index([mondayBoardId])
+}
+
+model PlanningItem {
+  id            Int       @id @default(autoincrement())
+  itemKey       String    @unique
+  boardId       Int?
+  jobId         String?
+  uniqueJob     String?
+  title         String
+  status        String    @default("Planned")
+  priority      String    @default("Normal")
+  ownerName     String?
+  startDate     DateTime?
+  dueDate       DateTime?
+  completionPct Decimal?  @db.Decimal(10, 2)
+  riskLevel     String    @default("Low")
+  sourceSystem  String    @default("SDI One")
+  mondayItemId  String?
+  raw           Json?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  board PlanningBoard? @relation(fields: [boardId], references: [id])
+  job   Job?           @relation(fields: [jobId], references: [jobId])
+  tasks PlanningTask[]
+
+  @@index([jobId])
+  @@index([uniqueJob])
+  @@index([status])
+  @@index([priority])
+  @@index([riskLevel])
+  @@index([mondayItemId])
+}
+
+model PlanningTask {
+  id           Int       @id @default(autoincrement())
+  taskKey      String    @unique
+  boardId      Int?
+  itemId       Int?
+  jobId        String?
+  title        String
+  status       String    @default("Not Started")
+  taskType     String?
+  assigneeName String?
+  startDate    DateTime?
+  dueDate      DateTime?
+  completedAt  DateTime?
+  percentDone  Decimal?  @db.Decimal(10, 2)
+  sourceSystem String    @default("SDI One")
+  raw          Json?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  board PlanningBoard? @relation(fields: [boardId], references: [id])
+  item  PlanningItem?  @relation(fields: [itemId], references: [id])
+  job   Job?           @relation(fields: [jobId], references: [jobId])
+
+  @@index([jobId])
+  @@index([status])
+  @@index([taskType])
+  @@index([dueDate])
+}
+
+model PlanningDependency {
+  id             Int      @id @default(autoincrement())
+  dependencyKey  String   @unique
+  predecessorKey String
+  successorKey   String
+  dependencyType String   @default("Finish-to-start")
+  lagDays        Int      @default(0)
+  status         String   @default("Active")
+  sourceSystem   String   @default("SDI One")
+  raw            Json?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([predecessorKey])
+  @@index([successorKey])
+  @@index([status])
+}
+
+model ResourceAssignment {
+  id            Int       @id @default(autoincrement())
+  assignmentKey String    @unique
+  jobId         String?
+  resourceType  String
+  resourceName  String
+  resourceId    String?
+  plannedHours  Decimal?  @db.Decimal(18, 2)
+  actualHours   Decimal?  @db.Decimal(18, 2)
+  startDate     DateTime?
+  endDate       DateTime?
+  status        String    @default("Planned")
+  sourceSystem  String    @default("SDI One")
+  raw           Json?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  job Job? @relation(fields: [jobId], references: [jobId])
+
+  @@index([jobId])
+  @@index([resourceType])
+  @@index([status])
+}

@@ -1,0 +1,15 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: sdi-command-center-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: sdi_command_center
+    ports:
+      - "5434:5432"
+    volumes:
+      - sdi_command_center_pg:/var/lib/postgresql/data
+volumes:
+  sdi_command_center_pg:
